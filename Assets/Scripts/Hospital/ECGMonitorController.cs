@@ -1,4 +1,4 @@
-using UnityEngine;
+ using UnityEngine;
 
 namespace DigitalCurtain.Hospital
 {
@@ -10,7 +10,7 @@ namespace DigitalCurtain.Hospital
 
         [Header("Heartbeat Settings")]
         public float beatsPerMinute = 64f;
-        public float scrollSpeed = 0.28f;
+        public float scrollSpeed = 0.35f;
         public bool isFlatline = false;
 
         private AudioSource _audioSource;
@@ -22,6 +22,21 @@ namespace DigitalCurtain.Hospital
         private Material _ledMat;
         private bool _flatlinePlaying;
 
+        private void Awake()
+        {
+            if (screenRenderer == null)
+            {
+                Transform screenTr = transform.Find("Terminal_Monitor_Head/Monitor_Screen");
+                if (screenTr != null) screenRenderer = screenTr.GetComponent<Renderer>();
+            }
+
+            if (ledRenderer == null)
+            {
+                Transform ledTr = transform.Find("Terminal_Monitor_Head/Monitor_PowerLED");
+                if (ledTr != null) ledRenderer = ledTr.GetComponent<Renderer>();
+            }
+        }
+
         private void Start()
         {
             _audioSource = GetComponent<AudioSource>();
@@ -30,7 +45,7 @@ namespace DigitalCurtain.Hospital
                 _audioSource = gameObject.AddComponent<AudioSource>();
             }
             _audioSource.spatialBlend = 1.0f;
-            _audioSource.volume = 0.45f;
+            _audioSource.volume = 0.5f;
 
             _beepClip = GenerateToneClip("ECG_Beep", 880f, 0.11f);
             _flatlineClip = GenerateToneClip("ECG_Flatline", 920f, 1.0f);
@@ -38,10 +53,9 @@ namespace DigitalCurtain.Hospital
             if (screenRenderer != null)
             {
                 _screenMat = screenRenderer.material;
-                if (_screenMat.mainTexture != null)
-                {
-                    _screenMat.mainTexture.wrapMode = TextureWrapMode.Repeat;
-                }
+                ConfigureRepeatTexture(_screenMat, "_BaseMap");
+                ConfigureRepeatTexture(_screenMat, "_MainTex");
+                ConfigureRepeatTexture(_screenMat, "_EmissionMap");
             }
 
             if (ledRenderer != null)
@@ -54,9 +68,10 @@ namespace DigitalCurtain.Hospital
         {
             if (_screenMat != null)
             {
-                _uvOffsetX = (_uvOffsetX + Time.deltaTime * scrollSpeed) % 1.0f;
+                _uvOffsetX = (_uvOffsetX - Time.deltaTime * scrollSpeed) % 1.0f;
                 Vector2 offset = new Vector2(_uvOffsetX, 0f);
                 _screenMat.SetTextureOffset("_BaseMap", offset);
+                _screenMat.SetTextureOffset("_MainTex", offset);
                 _screenMat.SetTextureOffset("_EmissionMap", offset);
             }
 
@@ -75,11 +90,30 @@ namespace DigitalCurtain.Hospital
                 TriggerHeartbeatPulse();
             }
 
-            // Smooth LED fade after pulse
+            float pulseRatio = Mathf.Clamp01(_beatTimer / (beatInterval * 0.55f));
+            float pulseGlow = Mathf.Lerp(3.8f, 0.45f, pulseRatio);
+
             if (_ledMat != null)
             {
-                float pulseGlow = Mathf.Lerp(3.5f, 0.4f, _beatTimer / (beatInterval * 0.6f));
                 _ledMat.SetColor("_EmissionColor", new Color(0.1f, 1.0f, 0.4f) * pulseGlow);
+            }
+
+            if (_screenMat != null)
+            {
+                float screenGlow = Mathf.Lerp(1.65f, 1.15f, pulseRatio);
+                _screenMat.SetColor("_EmissionColor", Color.white * screenGlow);
+            }
+        }
+
+        private void ConfigureRepeatTexture(Material mat, string propName)
+        {
+            if (mat != null && mat.HasProperty(propName))
+            {
+                Texture tex = mat.GetTexture(propName);
+                if (tex != null)
+                {
+                    tex.wrapMode = TextureWrapMode.Repeat;
+                }
             }
         }
 
@@ -95,7 +129,7 @@ namespace DigitalCurtain.Hospital
         {
             if (_ledMat != null)
             {
-                _ledMat.SetColor("_EmissionColor", new Color(1.0f, 0.15f, 0.1f) * 3.0f);
+                _ledMat.SetColor("_EmissionColor", new Color(1.0f, 0.15f, 0.1f) * 3.5f);
             }
 
             if (!_flatlinePlaying && _audioSource != null && _flatlineClip != null)
