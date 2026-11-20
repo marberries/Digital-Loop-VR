@@ -9,8 +9,8 @@ namespace DigitalCurtain.Hospital
     {
         [Header("Breathing Motion")]
         public float breathingRate = 0.28f;
-        public float verticalAmplitude = 0.012f;
-        public float pitchAmplitude = 0.65f;
+        public float verticalAmplitude = 0.014f;
+        public float pitchAmplitude = 0.75f;
 
         [Header("Neural Headset Transfer")]
         public Transform headsetVisor;
@@ -39,7 +39,7 @@ namespace DigitalCurtain.Hospital
 
             if (headsetVisor != null)
             {
-                headsetVisor.localPosition = new Vector3(0f, 0.35f, 0.25f);
+                headsetVisor.localPosition = new Vector3(0f, 0.45f, 0.42f);
             }
         }
 
@@ -47,26 +47,24 @@ namespace DigitalCurtain.Hospital
         {
             _elapsed += Time.deltaTime;
 
-            // Subtle breathing sway while lying on the hospital bed
             float wave = Mathf.Sin(_elapsed * Mathf.PI * 2f * breathingRate);
             transform.localPosition = _initialLocalPos + new Vector3(0f, wave * verticalAmplitude, 0f);
             transform.localRotation = _initialLocalRot * Quaternion.Euler(-wave * pitchAmplitude, 0f, 0f);
 
-            // Manual trigger with Space key or automatic timer
-            bool spacePressed = false;
+            bool triggerPressed = Input.GetKeyDown(KeyCode.Space);
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             {
-                spacePressed = true;
+                triggerPressed = true;
             }
 #endif
-            if (!_transferStarted && (spacePressed || (enableAutoTransfer && _elapsed >= autoTransferDelay)))
+            if (!_transferStarted && (triggerPressed || (enableAutoTransfer && _elapsed >= autoTransferDelay)))
             {
                 _transferStarted = true;
                 if (ecgMonitor != null)
                 {
-                    ecgMonitor.beatsPerMinute = 135f;
-                    ecgMonitor.scrollSpeed = 0.65f;
+                    ecgMonitor.beatsPerMinute = 138f;
+                    ecgMonitor.scrollSpeed = 0.75f;
                 }
             }
 
@@ -74,14 +72,12 @@ namespace DigitalCurtain.Hospital
             {
                 _transferProgress += Time.deltaTime * 0.35f;
 
-                // Lower neural headset visor toward eyes
                 if (headsetVisor != null)
                 {
-                    float visorY = Mathf.Lerp(0.35f, 0.0f, Mathf.Clamp01(_transferProgress * 1.4f));
-                    headsetVisor.localPosition = new Vector3(0f, visorY, 0.22f);
+                    float visorY = Mathf.Lerp(0.45f, 0.0f, Mathf.Clamp01(_transferProgress * 1.4f));
+                    headsetVisor.localPosition = new Vector3(0f, visorY, 0.42f);
                 }
 
-                // Trigger flatline and blackout near the end of transfer
                 if (_transferProgress >= 0.7f && ecgMonitor != null)
                 {
                     ecgMonitor.isFlatline = true;
