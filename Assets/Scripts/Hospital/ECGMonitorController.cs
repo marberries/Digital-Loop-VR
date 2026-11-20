@@ -1,4 +1,4 @@
- using UnityEngine;
+using UnityEngine;
 
 namespace DigitalCurtain.Hospital
 {
@@ -7,9 +7,10 @@ namespace DigitalCurtain.Hospital
         [Header("Screen & Indicator References")]
         public Renderer screenRenderer;
         public Renderer ledRenderer;
+        public Transform sweepCursor;
 
         [Header("Heartbeat Settings")]
-        public float beatsPerMinute = 64f;
+        public float beatsPerMinute = 68f;
         public float scrollSpeed = 0.35f;
         public bool isFlatline = false;
 
@@ -18,8 +19,10 @@ namespace DigitalCurtain.Hospital
         private AudioClip _flatlineClip;
         private float _uvOffsetX;
         private float _beatTimer;
+        private float _sweepProgress;
         private Material _screenMat;
         private Material _ledMat;
+        private Material _cursorMat;
         private bool _flatlinePlaying;
 
         private void Awake()
@@ -35,6 +38,11 @@ namespace DigitalCurtain.Hospital
                 Transform ledTr = transform.Find("Terminal_Monitor_Head/Monitor_PowerLED");
                 if (ledTr != null) ledRenderer = ledTr.GetComponent<Renderer>();
             }
+
+            if (sweepCursor == null)
+            {
+                sweepCursor = transform.Find("Terminal_Monitor_Head/ECG_Sweep_Cursor");
+            }
         }
 
         private void Start()
@@ -44,8 +52,8 @@ namespace DigitalCurtain.Hospital
             {
                 _audioSource = gameObject.AddComponent<AudioSource>();
             }
-            _audioSource.spatialBlend = 1.0f;
-            _audioSource.volume = 0.5f;
+            _audioSource.spatialBlend = 0.35f;
+            _audioSource.volume = 0.65f;
 
             _beepClip = GenerateToneClip("ECG_Beep", 880f, 0.11f);
             _flatlineClip = GenerateToneClip("ECG_Flatline", 920f, 1.0f);
@@ -61,6 +69,15 @@ namespace DigitalCurtain.Hospital
             if (ledRenderer != null)
             {
                 _ledMat = ledRenderer.material;
+            }
+
+            if (sweepCursor != null)
+            {
+                Renderer cursorRenderer = sweepCursor.GetComponent<Renderer>();
+                if (cursorRenderer != null)
+                {
+                    _cursorMat = cursorRenderer.material;
+                }
             }
         }
 
@@ -90,8 +107,28 @@ namespace DigitalCurtain.Hospital
                 TriggerHeartbeatPulse();
             }
 
+            // Sweep glowing cursor left-to-right across the monitor screen
+            if (sweepCursor != null)
+            {
+                _sweepProgress = (_sweepProgress + Time.deltaTime * (beatsPerMinute / 95f)) % 1.0f;
+                float cursorX = Mathf.Lerp(-0.23f, 0.23f, _sweepProgress);
+
+                float spikeY = 0f;
+                float beatPhase = _beatTimer / beatInterval;
+                if (beatPhase < 0.08f)
+                {
+                    spikeY = Mathf.Sin((beatPhase / 0.08f) * Mathf.PI) * 0.095f;
+                }
+                else if (beatPhase < 0.14f)
+                {
+                    spikeY = -Mathf.Sin(((beatPhase - 0.08f) / 0.06f) * Mathf.PI) * 0.045f;
+                }
+
+                sweepCursor.localPosition = new Vector3(cursorX, 0.01f + spikeY, -0.075f);
+            }
+
             float pulseRatio = Mathf.Clamp01(_beatTimer / (beatInterval * 0.55f));
-            float pulseGlow = Mathf.Lerp(3.8f, 0.45f, pulseRatio);
+            float pulseGlow = Mathf.Lerp(4.0f, 0.5f, pulseRatio);
 
             if (_ledMat != null)
             {
@@ -127,9 +164,24 @@ namespace DigitalCurtain.Hospital
 
         private void HandleFlatline()
         {
+            Color alarmRed = new Color(1.0f, 0.12f, 0.08f);
+
             if (_ledMat != null)
             {
-                _ledMat.SetColor("_EmissionColor", new Color(1.0f, 0.15f, 0.1f) * 3.5f);
+                _ledMat.SetColor("_EmissionColor", alarmRed * 3.5f);
+            }
+
+            if (_cursorMat != null)
+            {
+                _cursorMat.SetColor("_BaseColor", alarmRed);
+                _cursorMat.SetColor("_EmissionColor", alarmRed * 4.0f);
+            }
+
+            if (sweepCursor != null)
+            {
+                _sweepProgress = (_sweepProgress + Time.deltaTime * 1.4f) % 1.0f;
+                float cursorX = Mathf.Lerp(-0.23f, 0.23f, _sweepProgress);
+                sweepCursor.localPosition = new Vector3(cursorX, 0.01f, -0.075f);
             }
 
             if (!_flatlinePlaying && _audioSource != null && _flatlineClip != null)
@@ -157,7 +209,7 @@ namespace DigitalCurtain.Hospital
                     float fadeOut = Mathf.Clamp01((duration - t) / 0.02f);
                     envelope = fadeIn * fadeOut;
                 }
-                samples[i] = Mathf.Sin(2f * Mathf.PI * frequency * t) * 0.35f * envelope;
+                samples[i] = Mathf.Sin(2f * Mathf.PI * frequency * t) * 0.45f * envelope;
             }
 
             AudioClip clip = AudioClip.Create(clipName, sampleCount, 1, sampleRate, false);
