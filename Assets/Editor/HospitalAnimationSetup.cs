@@ -8,19 +8,48 @@ public class HospitalAnimationSetup : EditorWindow
     [MenuItem("Tools/Hospital Ward/4. Attach Animations & Live Effects")]
     public static void AttachAnimations()
     {
+        int attachedCount = 0;
+
+        // 1. Setup ECG Monitor Animation, Sweep Cursor & Heartbeat Audio
         GameObject terminal = GameObject.Find("Med_Terminal");
         if (terminal != null)
         {
             ECGMonitorController ecg = terminal.GetComponent<ECGMonitorController>();
             if (ecg == null) ecg = terminal.AddComponent<ECGMonitorController>();
 
-            Transform screenTr = terminal.transform.Find("Terminal_Monitor_Head/Monitor_Screen");
-            Transform ledTr = terminal.transform.Find("Terminal_Monitor_Head/Monitor_PowerLED");
+            Transform headTr = terminal.transform.Find("Terminal_Monitor_Head");
+            if (headTr != null)
+            {
+                Transform screenTr = headTr.Find("Monitor_Screen");
+                Transform ledTr = headTr.Find("Monitor_PowerLED");
 
-            if (screenTr != null) ecg.screenRenderer = screenTr.GetComponent<Renderer>();
-            if (ledTr != null) ecg.ledRenderer = ledTr.GetComponent<Renderer>();
+                if (screenTr != null) ecg.screenRenderer = screenTr.GetComponent<Renderer>();
+                if (ledTr != null) ecg.ledRenderer = ledTr.GetComponent<Renderer>();
+
+                Transform oldCursor = headTr.Find("ECG_Sweep_Cursor");
+                if (oldCursor != null) DestroyImmediate(oldCursor.gameObject);
+
+                GameObject cursor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                cursor.name = "ECG_Sweep_Cursor";
+                cursor.transform.SetParent(headTr);
+                cursor.transform.localPosition = new Vector3(-0.23f, 0.01f, -0.075f);
+                cursor.transform.localRotation = Quaternion.identity;
+                cursor.transform.localScale = new Vector3(0.012f, 0.042f, 0.005f);
+                DestroyImmediate(cursor.GetComponent<Collider>());
+
+                Material cursorMat = HospitalMaterials.CreateEmissiveMaterial(
+                    "ECG_Cursor_Mat",
+                    new Color(0.2f, 1.0f, 0.5f),
+                    new Color(0.2f, 1.0f, 0.5f),
+                    3.5f
+                );
+                cursor.GetComponent<Renderer>().sharedMaterial = cursorMat;
+                ecg.sweepCursor = cursor.transform;
+            }
+            attachedCount++;
         }
 
+        // 2. Setup Flickering Ceiling Light (Fixture #3)
         GameObject fixture = GameObject.Find("Ceiling_Light_Fixture_3");
         if (fixture != null)
         {
@@ -38,21 +67,25 @@ public class HospitalAnimationSetup : EditorWindow
                     tubeR.GetComponent<Renderer>()
                 };
             }
+            attachedCount++;
         }
 
+        // 3. Setup Patient Breathing, Neural Headset Visor & Blackout Fade on Main Camera
         GameObject cameraOffset = GameObject.Find("Camera Offset");
-        GameObject mainCamera = GameObject.Find("Main Camera");
+        if (cameraOffset != null)
+        {
+            PatientBreathingAndIntro oldIntro = cameraOffset.GetComponent<PatientBreathingAndIntro>();
+            if (oldIntro != null) DestroyImmediate(oldIntro);
+        }
 
-        if (cameraOffset != null && mainCamera != null)
+        GameObject mainCamera = GameObject.Find("Main Camera");
+        if (mainCamera != null)
         {
             Camera cam = mainCamera.GetComponent<Camera>();
-            if (cam != null)
-            {
-                cam.nearClipPlane = 0.1f;
-            }
+            if (cam != null) cam.nearClipPlane = 0.1f;
 
-            PatientBreathingAndIntro intro = cameraOffset.GetComponent<PatientBreathingAndIntro>();
-            if (intro == null) intro = cameraOffset.AddComponent<PatientBreathingAndIntro>();
+            PatientBreathingAndIntro intro = mainCamera.GetComponent<PatientBreathingAndIntro>();
+            if (intro == null) intro = mainCamera.AddComponent<PatientBreathingAndIntro>();
 
             if (terminal != null)
             {
@@ -96,9 +129,10 @@ public class HospitalAnimationSetup : EditorWindow
             Renderer fadeRenderer = fadeQuad.GetComponent<Renderer>();
             fadeRenderer.sharedMaterial = fadeMat;
             intro.blackoutOverlay = fadeRenderer;
+            attachedCount++;
         }
 
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-        Debug.Log("[HospitalAnimationSetup] ECG pulse, audio beep, flickering light, breathing, and headset intro attached!");
+        Debug.Log($"[HospitalAnimationSetup] Successfully configured {attachedCount}/3 live systems (ECG Monitor, Ceiling Flicker, Patient Intro).");
     }
 }
