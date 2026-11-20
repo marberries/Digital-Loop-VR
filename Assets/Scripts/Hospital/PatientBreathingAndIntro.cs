@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.XR;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -8,9 +9,9 @@ namespace DigitalCurtain.Hospital
     public class PatientBreathingAndIntro : MonoBehaviour
     {
         [Header("Breathing Motion")]
-        public float breathingRate = 0.28f;
-        public float verticalAmplitude = 0.014f;
-        public float pitchAmplitude = 0.75f;
+        public float breathingRate = 0.30f;
+        public float verticalAmplitude = 0.018f;
+        public float pitchAmplitude = 1.1f;
 
         [Header("Neural Headset Transfer")]
         public Transform headsetVisor;
@@ -28,6 +29,19 @@ namespace DigitalCurtain.Hospital
 
         private void Start()
         {
+            // Release camera lock when testing on Mac without an active VR headset
+            if (!XRSettings.isDeviceActive)
+            {
+                Behaviour[] behaviours = GetComponents<Behaviour>();
+                for (int i = 0; i < behaviours.Length; i++)
+                {
+                    if (behaviours[i] != null && behaviours[i].GetType().Name.Contains("TrackedPoseDriver"))
+                    {
+                        behaviours[i].enabled = false;
+                    }
+                }
+            }
+
             _initialLocalPos = transform.localPosition;
             _initialLocalRot = transform.localRotation;
 
@@ -51,9 +65,14 @@ namespace DigitalCurtain.Hospital
             transform.localPosition = _initialLocalPos + new Vector3(0f, wave * verticalAmplitude, 0f);
             transform.localRotation = _initialLocalRot * Quaternion.Euler(-wave * pitchAmplitude, 0f, 0f);
 
-            bool triggerPressed = Input.GetKeyDown(KeyCode.Space);
+            bool triggerPressed = false;
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+            {
+                triggerPressed = true;
+            }
+#else
+            if (Input.GetKeyDown(KeyCode.Space))
             {
                 triggerPressed = true;
             }
@@ -63,8 +82,8 @@ namespace DigitalCurtain.Hospital
                 _transferStarted = true;
                 if (ecgMonitor != null)
                 {
-                    ecgMonitor.beatsPerMinute = 138f;
-                    ecgMonitor.scrollSpeed = 0.75f;
+                    ecgMonitor.beatsPerMinute = 140f;
+                    ecgMonitor.scrollSpeed = 0.80f;
                 }
             }
 
